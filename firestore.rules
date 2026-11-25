@@ -1,0 +1,30 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function txt(s, n) { return s is string && s.size() >= 2 && s.size() <= n; }
+    match /users/{u} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == u
+        && txt(request.resource.data.name, 40)
+        && request.resource.data.get('bio', '').size() <= 300
+        && request.resource.data.get('photo', '').size() <= 400;
+    }
+    match /private/{u} {
+      allow read, write: if request.auth != null && request.auth.uid == u;
+    }
+    match /comments/{c} {
+      allow read: if true;
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid
+        && txt(request.resource.data.text, 500) && txt(request.resource.data.key, 30);
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
+    }
+    match /posts/{p} {
+      allow read: if true;
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid
+        && txt(request.resource.data.text, 500) && request.resource.data.likes == [];
+      allow update: if request.auth != null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes']);
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
+    }
+  }
+}
